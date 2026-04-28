@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: market-data-adapter
+
+  main:
+    keep-alive: true
+
+  threads:
+    virtual:
+      enabled: true   # Java 21 Project Loom — virtual threads for all blocking I/O
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false   # cleaner messages, no Spring type headers
+
+# Tick frequency — how often the simulator fires per cycle
+adapter:
+  tick-interval-ms: 500   # 2 ticks/second per symbol = 8 events/second total
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  port: 8081
+
+logging:
+  level:
+    com.candle: INFO
+    org.apache.kafka: WARN

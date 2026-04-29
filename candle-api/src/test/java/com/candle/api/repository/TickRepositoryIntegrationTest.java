@@ -14,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 
@@ -33,7 +34,9 @@ class TickRepositoryIntegrationTest {
 
     @Container
     static final PostgreSQLContainer<?> timescaledb =
-        new PostgreSQLContainer<>("timescale/timescaledb:latest-pg15")
+        new PostgreSQLContainer<>(
+            DockerImageName.parse("timescale/timescaledb:latest-pg15")
+                .asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("candles")
             .withUsername("candle")
             .withPassword("candle");

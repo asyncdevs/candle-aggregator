@@ -58,7 +58,7 @@ class CandleIntervalTest {
         "1s,  1, 1620000042, 1620000042",
         "5s,  5, 1620000007, 1620000005",
         "1m,  60, 1620000075, 1620000060",
-        "15m, 900, 1620000901, 1620000000",
+        "15m, 900, 1620000601, 1620000000",
         "1h,  3600, 1620003661, 1620003600"
     })
     void windowStart_parameterized(String label, long durationSec, long input, long expected) {

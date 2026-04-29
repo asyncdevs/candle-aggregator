@@ -24,11 +24,11 @@ public class CandleAggregationService {
     private final CandleEventPublisher        eventPublisher;
 
     // Aggregation hierarchy — each interval is built from its source
-    private static final List<CandleInterval> HIGHER_INTERVALS =
+    static final List<CandleInterval> HIGHER_INTERVALS =
         List.of(CandleInterval.FIVE_SECONDS, CandleInterval.ONE_MINUTE,
                 CandleInterval.FIFTEEN_MIN,  CandleInterval.ONE_HOUR);
 
-    private static final Map<CandleInterval, CandleInterval> SOURCE_INTERVAL = Map.of(
+    static final Map<CandleInterval, CandleInterval> SOURCE_INTERVAL = Map.of(
         CandleInterval.FIVE_SECONDS, CandleInterval.ONE_SECOND,
         CandleInterval.ONE_MINUTE,   CandleInterval.FIVE_SECONDS,
         CandleInterval.FIFTEEN_MIN,  CandleInterval.ONE_MINUTE,
@@ -36,28 +36,29 @@ public class CandleAggregationService {
     );
 
     /**
-     * Full processing pipeline for one BidAskEvent, wrapped in a single transaction:
-     *
-     *   1. Upsert the 1s candle from this tick's mid-price.
-     *   2. For each higher interval (5s → 1m → 15m → 1h):
-     *        - Check whether the current window has advanced past the stored state.
-     *        - If yes, aggregate the just-closed window from its source interval and publish.
-     *
-     * Ordering (5s before 1m, etc.) ensures the source candle is always stored
-     * before the next level tries to aggregate it.
+     * Tick pipeline — only persists the raw 1s candle.
+     * Higher-interval aggregation is handled by the scheduler.
      */
     @Transactional
     public void process(BidAskEvent event) {
-        long   tickSeconds = event.timestampSeconds();
-        double midPrice    = event.midPrice();
-        String symbol      = event.symbol();
+        candleRepository.upsertTick(
+            event.symbol(), event.timestampSeconds(), event.midPrice());
+    }
 
-        // Step 1 — raw tick into 1s candle
-        candleRepository.upsertTick(symbol, tickSeconds, midPrice);
-
-        // Step 2 — cascade aggregation for higher intervals
+    /**
+     * Called by {@link CandleAggregationScheduler} on every 5-second clock tick.
+     *
+     * Checks every higher interval for the given symbol:
+     *   - If the current wall-clock window is ahead of stored state → the previous window closed.
+     *   - Aggregates that closed window from its source interval and publishes the candle event.
+     *
+     * Cascade order (5s → 1m → 15m → 1h) ensures each source candle is written
+     * before the next level reads it, all within a single transaction.
+     */
+    @Transactional
+    public void aggregateHigherIntervals(String symbol, long nowSeconds) {
         for (CandleInterval interval : HIGHER_INTERVALS) {
-            long newWindowStart = interval.windowStart(tickSeconds);
+            long newWindowStart = interval.windowStart(nowSeconds);
 
             Optional<Long> closedWindowStart =
                 stateRepository.tryAdvanceWindow(symbol, interval, newWindowStart);
@@ -70,7 +71,7 @@ public class CandleAggregationService {
                     candleRepository.aggregate(symbol, interval, source, ws, windowEnd);
 
                 candle.ifPresent(c -> {
-                    log.info("[INGESTION] Closed {} {} t={} o={} h={} l={} c={} v={}",
+                    log.info("[SCHEDULER] Closed {} {} windowEnd={} o={} h={} l={} c={} v={}",
                         c.symbol(), c.interval(), c.time(),
                         c.open(), c.high(), c.low(), c.close(), c.volume());
                     eventPublisher.publish(c);

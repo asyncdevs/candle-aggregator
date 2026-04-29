@@ -16,8 +16,7 @@
     <modules>
         <module>common</module>
         <module>market-data-adapter</module>
-        <module>stream-ingestion</module>
-        <module>history-api</module>
+        <module>candle-api</module>
         <module>logger-service</module>
     </modules>
 
@@ -36,11 +35,11 @@
 
         <!-- Dependency versions — managed here, referenced in child POMs -->
         <spring-kafka.version>3.1.2</spring-kafka.version>
-        <redisson.version>3.27.0</redisson.version>
         <jackson.version>2.16.1</jackson.version>
         <lombok.version>1.18.30</lombok.version>
         <testcontainers.version>1.19.6</testcontainers.version>
         <timescale.driver.version>42.7.2</timescale.driver.version>
+        <logstash-encoder.version>7.4</logstash-encoder.version>
     </properties>
 
     <dependencyManagement>
@@ -60,11 +59,11 @@
                 <version>${spring-kafka.version}</version>
             </dependency>
 
-            <!-- Redis — Redisson for MGET and TTL support -->
+            <!-- Logstash Logback Encoder — structured JSON log shipping -->
             <dependency>
-                <groupId>org.redisson</groupId>
-                <artifactId>redisson-spring-boot-starter</artifactId>
-                <version>${redisson.version}</version>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-encoder.version}</version>
             </dependency>
 
             <!-- PostgreSQL / TimescaleDB driver -->

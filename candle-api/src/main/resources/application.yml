@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: candle-api
+
+  threads:
+    virtual:
+      enabled: true   # Java 21 Project Loom — virtual threads for all blocking I/O
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: candle-api-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.candle.common.model"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.candle.common.model.BidAskEvent
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/candles}
+    username: ${DB_USER:candle}
+    password: ${DB_PASS:candle}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+# ── Actuator / Health ─────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, env
+  endpoint:
+    health:
+      show-details: always
+  health:
+    kafka:
+      enabled: true
+    db:
+      enabled: true
+
+server:
+  port: 8082
+
+# ── Logstash ──────────────────────────────────────────────────────────────
+logstash:
+  host: ${LOGSTASH_HOST:localhost}
+  port: ${LOGSTASH_PORT:5044}
+
+# ── Logging ───────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.candle: INFO
+    org.apache.kafka: WARN
+    org.springframework.jdbc.core: WARN

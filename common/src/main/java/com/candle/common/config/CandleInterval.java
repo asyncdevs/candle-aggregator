@@ -54,6 +54,20 @@ public enum CandleInterval {
         return interval;
     }
 
+    /**
+     * Returns the PostgreSQL interval literal used in time_bucket() queries.
+     * e.g. CandleInterval.ONE_MINUTE.toPgInterval() → "1 minute"
+     */
+    public String toPgInterval() {
+        return switch (this) {
+            case ONE_SECOND   -> "1 second";
+            case FIVE_SECONDS -> "5 seconds";
+            case ONE_MINUTE   -> "1 minute";
+            case FIFTEEN_MIN  -> "15 minutes";
+            case ONE_HOUR     -> "1 hour";
+        };
+    }
+
     @Override
     public String toString() { return label; }
 }

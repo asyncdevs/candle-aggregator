@@ -12,21 +12,37 @@
     </parent>
 
     <artifactId>logger-service</artifactId>
-    <description>Pure Kafka consumer — archives candle and audit events to local filesystem</description>
+    <description>
+        Kafka consumer for raw BidAsk ticks.
+        Ships every event as a structured log line via Logstash → Elasticsearch.
+        No direct Elasticsearch client — Logstash is the only path to the ELK stack.
+    </description>
 
     <dependencies>
         <dependency>
             <groupId>com.candle</groupId>
             <artifactId>common</artifactId>
         </dependency>
+
+        <!-- Web — exposes /actuator/health over HTTP -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- Actuator — health + metrics endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Kafka — BidAsk event consumer -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+
+        <!-- JSON -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -35,9 +51,12 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
+
+        <!-- Logstash structured log shipping (replaces direct ES client) -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash-encoder.version}</version>
         </dependency>
     </dependencies>
 

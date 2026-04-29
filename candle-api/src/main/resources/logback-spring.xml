@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Pull service name and Logstash address from Spring properties -->
+    <springProperty scope="context" name="SERVICE_NAME"    source="spring.application.name"  defaultValue="candle-api"/>
+    <springProperty scope="context" name="LOGSTASH_HOST"   source="logstash.host"             defaultValue="localhost"/>
+    <springProperty scope="context" name="LOGSTASH_PORT"   source="logstash.port"             defaultValue="5044"/>
+
+    <!-- ── Console appender (human-readable, for local dev / Docker logs) ── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Logstash TCP appender (structured JSON → Logstash → Elasticsearch) ── -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
+        <!-- Reconnect every 10 s if Logstash is temporarily unavailable -->
+        <reconnectionDelay>10 second</reconnectionDelay>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Adds "service":"candle-api" to every JSON log line -->
+            <customFields>{"service":"${SERVICE_NAME}"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- Async wrapper — prevents Logstash back-pressure from blocking app threads -->
+    <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="LOGSTASH"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <!-- neverBlock=true: drop log if queue full rather than stalling the caller -->
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <!-- ── Root logger: console always on; Logstash when host is reachable ── -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_LOGSTASH"/>
+    </root>
+
+    <logger name="com.candle"              level="INFO"/>
+    <logger name="org.apache.kafka"        level="WARN"/>
+    <logger name="org.springframework"     level="WARN"/>
+    <logger name="org.springframework.jdbc.core" level="WARN"/>
+
+</configuration>

@@ -1,28 +1,23 @@
 spring:
   application:
-    name: market-data-adapter
+    name: logger-service
 
   main:
     keep-alive: true
 
   threads:
     virtual:
-      enabled: true   # Java 21 Project Loom
+      enabled: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        enable.idempotence: true
-        spring.json.add.type.headers: false
-
-# Tick frequency — how often the simulator fires per cycle
-adapter:
-  tick-interval-ms: 500   # 2 ticks/s per symbol = 8 events/s total (4 symbols)
+        spring.json.trusted.packages: "com.candle.common.model"
+        spring.json.use.type.headers: false
 
 # ── Actuator / Health ─────────────────────────────────────────────────────
 management:
@@ -38,7 +33,7 @@ management:
       enabled: true
 
 server:
-  port: 8081
+  port: 8083
 
 # ── Logstash ──────────────────────────────────────────────────────────────
 logstash:

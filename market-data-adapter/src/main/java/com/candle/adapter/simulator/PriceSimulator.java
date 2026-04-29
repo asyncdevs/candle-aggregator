@@ -3,6 +3,8 @@ package com.candle.adapter.simulator;
 import com.candle.common.config.Symbols;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -13,6 +15,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * Each symbol starts at a realistic base price and walks randomly
  * within a small percentage range per tick — mimicking real market
  * micro-movements without extreme volatility.
+ *
+ * Internal price state is maintained as double for efficient random-walk
+ * arithmetic. Outputs are converted to BigDecimal at the boundary to
+ * preserve exact decimal representation for downstream financial calculations.
  */
 @Component
 public class PriceSimulator {
@@ -40,16 +46,14 @@ public class PriceSimulator {
     private final Map<String, Double> currentPrices = new ConcurrentHashMap<>(BASE_PRICES);
 
     /**
-     * Returns the next [bid, ask] for the given symbol.
+     * Returns the next [bid, ask] for the given symbol as BigDecimal.
      * Mutates internal state — each call advances the random walk.
      */
-    public double[] nextBidAsk(String symbol) {
+    public BigDecimal[] nextBidAsk(String symbol) {
         double current = currentPrices.compute(symbol, (s, price) -> {
             if (price == null) price = BASE_PRICES.getOrDefault(s, 100.0);
-            // Random walk: move up or down by up to TICK_VOLATILITY %
             double change = price * TICK_VOLATILITY
                     * (ThreadLocalRandom.current().nextDouble() * 2 - 1);
-            // Clamp: price should not deviate more than 10% from base
             double base    = BASE_PRICES.getOrDefault(s, price);
             double newPrice = price + change;
             newPrice = Math.max(newPrice, base * 0.90);
@@ -60,14 +64,14 @@ public class PriceSimulator {
         double spreadPct = SPREAD_PCT.getOrDefault(symbol, 0.0002);
         double halfSpread = current * spreadPct / 2.0;
 
-        double bid = round(current - halfSpread, symbol);
-        double ask = round(current + halfSpread, symbol);
+        BigDecimal bid = round(current - halfSpread, symbol);
+        BigDecimal ask = round(current + halfSpread, symbol);
 
-        return new double[]{bid, ask};
+        return new BigDecimal[]{bid, ask};
     }
 
     /** Round to appropriate decimal places per instrument type. */
-    private double round(double value, String symbol) {
+    private BigDecimal round(double value, String symbol) {
         int decimals = switch (symbol) {
             case Symbols.BTC_USD -> 2;
             case Symbols.ETH_USD -> 2;
@@ -75,7 +79,6 @@ public class PriceSimulator {
             case Symbols.XAG_USD -> 4;
             default              -> 4;
         };
-        double factor = Math.pow(10, decimals);
-        return Math.round(value * factor) / factor;
+        return BigDecimal.valueOf(value).setScale(decimals, RoundingMode.HALF_UP);
     }
 }

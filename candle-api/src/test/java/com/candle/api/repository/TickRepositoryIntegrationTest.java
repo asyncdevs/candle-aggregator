@@ -4,6 +4,8 @@ import com.candle.common.config.CandleInterval;
 import com.candle.common.model.BidAskEvent;
 import com.candle.common.model.Candle;
 import org.junit.jupiter.api.BeforeAll;
+
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -55,11 +57,11 @@ class TickRepositoryIntegrationTest {
 
         jdbcTemplate.execute("""
             CREATE TABLE IF NOT EXISTS ticks (
-                time      TIMESTAMPTZ      NOT NULL,
-                symbol    TEXT             NOT NULL,
-                bid       DOUBLE PRECISION NOT NULL,
-                ask       DOUBLE PRECISION NOT NULL,
-                mid_price DOUBLE PRECISION NOT NULL
+                time      TIMESTAMPTZ   NOT NULL,
+                symbol    TEXT          NOT NULL,
+                bid       NUMERIC(19,8) NOT NULL,
+                ask       NUMERIC(19,8) NOT NULL,
+                mid_price NUMERIC(19,8) NOT NULL
             )
             """);
 
@@ -80,7 +82,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void insertTick_persistsExactlyOneRow() {
-        tickRepository.insertTick(btcEvent(1620000000000L, 29000.0, 29100.0));
+        tickRepository.insertTick(btcEvent(1620000000000L, "29000", "29100"));
 
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticks", Long.class);
         assertThat(count).isEqualTo(1L);
@@ -88,26 +90,26 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void insertTick_storesMidPriceAsAverageOfBidAndAsk() {
-        tickRepository.insertTick(btcEvent(1620000000000L, 29000.0, 29100.0));
+        tickRepository.insertTick(btcEvent(1620000000000L, "29000", "29100"));
 
-        Double mid = jdbcTemplate.queryForObject("SELECT mid_price FROM ticks", Double.class);
-        assertThat(mid).isEqualTo(29050.0);
+        BigDecimal mid = jdbcTemplate.queryForObject("SELECT mid_price FROM ticks", BigDecimal.class);
+        assertThat(mid).isEqualByComparingTo(new BigDecimal("29050"));
     }
 
     @Test
     void insertTick_storesBidAndAskSeparately() {
-        tickRepository.insertTick(new BidAskEvent("ETH-USD", 3490.0, 3510.0, 1620000001000L));
+        tickRepository.insertTick(new BidAskEvent("ETH-USD", bd("3490"), bd("3510"), 1620000001000L));
 
         var row = jdbcTemplate.queryForMap("SELECT bid, ask, symbol FROM ticks");
-        assertThat((Double) row.get("bid")).isEqualTo(3490.0);
-        assertThat((Double) row.get("ask")).isEqualTo(3510.0);
+        assertThat((BigDecimal) row.get("bid")).isEqualByComparingTo(bd("3490"));
+        assertThat((BigDecimal) row.get("ask")).isEqualByComparingTo(bd("3510"));
         assertThat((String) row.get("symbol")).isEqualTo("ETH-USD");
     }
 
     @Test
     void insertTick_preservesMillisecondTimestampPrecision() {
         // Timestamp at 500ms — should be stored with sub-second precision
-        tickRepository.insertTick(btcEvent(1620000000500L, 29000.0, 29100.0));
+        tickRepository.insertTick(btcEvent(1620000000500L, "29000", "29100"));
 
         // Verify the stored time is rounded to within 1 second of the input
         Long count = jdbcTemplate.queryForObject(
@@ -118,10 +120,10 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void insertTick_multipleEvents_allPersisted() {
-        tickRepository.insertTick(btcEvent(1620000000000L, 29000.0, 29100.0));
-        tickRepository.insertTick(new BidAskEvent("ETH-USD", 3490.0, 3510.0, 1620000001000L));
-        tickRepository.insertTick(new BidAskEvent("XAU-USD", 2295.0, 2305.0, 1620000002000L));
-        tickRepository.insertTick(new BidAskEvent("XAG-USD", 28.45,  28.55,  1620000003000L));
+        tickRepository.insertTick(btcEvent(1620000000000L, "29000", "29100"));
+        tickRepository.insertTick(new BidAskEvent("ETH-USD", bd("3490"),  bd("3510"),  1620000001000L));
+        tickRepository.insertTick(new BidAskEvent("XAU-USD", bd("2295"),  bd("2305"),  1620000002000L));
+        tickRepository.insertTick(new BidAskEvent("XAG-USD", bd("28.45"), bd("28.55"), 1620000003000L));
 
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ticks", Long.class);
         assertThat(count).isEqualTo(4L);
@@ -138,7 +140,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_wrongSymbol_returnsEmptyList() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0));
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100"));
 
         var candles = tickRepository.queryCandles(
             "ETH-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -149,7 +151,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_singleTick_returnsSingleCandleWithFlatOHLC() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0)); // mid = 29050
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100")); // mid = 29050
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -158,44 +160,44 @@ class TickRepositoryIntegrationTest {
         Candle c = candles.getFirst();
         assertThat(c.symbol()).isEqualTo("BTC-USD");
         assertThat(c.interval()).isEqualTo("1m");
-        assertThat(c.open()).isEqualTo(c.close()); // single tick
-        assertThat(c.high()).isEqualTo(c.low());   // single tick
+        assertThat(c.open()).isEqualByComparingTo(c.close()); // single tick
+        assertThat(c.high()).isEqualByComparingTo(c.low());   // single tick
         assertThat(c.volume()).isEqualTo(1L);
     }
 
     @Test
     void queryCandles_twoTicksSameWindow_correctOHLCV() {
         // mid prices: 29050 then 29250
-        tickRepository.insertTick(btcEvent(1620000010000L, 29000.0, 29100.0)); // mid=29050, first
-        tickRepository.insertTick(btcEvent(1620000040000L, 29200.0, 29300.0)); // mid=29250, last
+        tickRepository.insertTick(btcEvent(1620000010000L, "29000", "29100")); // mid=29050, first
+        tickRepository.insertTick(btcEvent(1620000040000L, "29200", "29300")); // mid=29250, last
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
 
         assertThat(candles).hasSize(1);
         Candle c = candles.getFirst();
-        assertThat(c.open()).isEqualTo(29050.0);  // first mid price
-        assertThat(c.close()).isEqualTo(29250.0); // last mid price
-        assertThat(c.high()).isEqualTo(29250.0);  // max mid price
-        assertThat(c.low()).isEqualTo(29050.0);   // min mid price
+        assertThat(c.open()).isEqualByComparingTo(bd("29050"));  // first mid price
+        assertThat(c.close()).isEqualByComparingTo(bd("29250")); // last mid price
+        assertThat(c.high()).isEqualByComparingTo(bd("29250"));  // max mid price
+        assertThat(c.low()).isEqualByComparingTo(bd("29050"));   // min mid price
         assertThat(c.volume()).isEqualTo(2L);
     }
 
     @Test
     void queryCandles_threeTicksSameWindow_highAndLowCorrect() {
-        tickRepository.insertTick(btcEvent(1620000010000L, 29100.0, 29200.0)); // mid=29150
-        tickRepository.insertTick(btcEvent(1620000020000L, 28900.0, 29000.0)); // mid=28950 ← lowest
-        tickRepository.insertTick(btcEvent(1620000050000L, 29300.0, 29400.0)); // mid=29350 ← highest
+        tickRepository.insertTick(btcEvent(1620000010000L, "29100", "29200")); // mid=29150
+        tickRepository.insertTick(btcEvent(1620000020000L, "28900", "29000")); // mid=28950 ← lowest
+        tickRepository.insertTick(btcEvent(1620000050000L, "29300", "29400")); // mid=29350 ← highest
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
 
         assertThat(candles).hasSize(1);
         Candle c = candles.getFirst();
-        assertThat(c.open()).isEqualTo(29150.0);  // first tick
-        assertThat(c.close()).isEqualTo(29350.0); // last tick
-        assertThat(c.high()).isEqualTo(29350.0);
-        assertThat(c.low()).isEqualTo(28950.0);
+        assertThat(c.open()).isEqualByComparingTo(bd("29150"));  // first tick
+        assertThat(c.close()).isEqualByComparingTo(bd("29350")); // last tick
+        assertThat(c.high()).isEqualByComparingTo(bd("29350"));
+        assertThat(c.low()).isEqualByComparingTo(bd("28950"));
         assertThat(c.volume()).isEqualTo(3L);
     }
 
@@ -203,8 +205,8 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_ticksInDifferentWindows_returnsMultipleCandles() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0)); // minute 0
-        tickRepository.insertTick(btcEvent(1620000090000L, 29200.0, 29300.0)); // minute 1
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100")); // minute 0
+        tickRepository.insertTick(btcEvent(1620000090000L, "29200", "29300")); // minute 1
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000120L);
@@ -217,9 +219,9 @@ class TickRepositoryIntegrationTest {
     @Test
     void queryCandles_fiveSecondInterval_correctBuckets() {
         // ticks at t=0s, t=3s → bucket [0,5), tick at t=7s → bucket [5,10)
-        tickRepository.insertTick(btcEvent(1620000000000L, 29000.0, 29100.0));
-        tickRepository.insertTick(btcEvent(1620000003000L, 29100.0, 29200.0));
-        tickRepository.insertTick(btcEvent(1620000007000L, 29200.0, 29300.0));
+        tickRepository.insertTick(btcEvent(1620000000000L, "29000", "29100"));
+        tickRepository.insertTick(btcEvent(1620000003000L, "29100", "29200"));
+        tickRepository.insertTick(btcEvent(1620000007000L, "29200", "29300"));
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.FIVE_SECONDS, 1620000000L, 1620000010L);
@@ -235,7 +237,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_fromBoundary_inclusive() {
-        tickRepository.insertTick(btcEvent(1620000000000L, 29000.0, 29100.0)); // exactly at 'from'
+        tickRepository.insertTick(btcEvent(1620000000000L, "29000", "29100")); // exactly at 'from'
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -245,7 +247,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_toBoundary_exclusive() {
-        tickRepository.insertTick(btcEvent(1620000060000L, 29000.0, 29100.0)); // exactly at 'to'
+        tickRepository.insertTick(btcEvent(1620000060000L, "29000", "29100")); // exactly at 'to'
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -255,8 +257,8 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_tickBeforeFrom_excluded() {
-        tickRepository.insertTick(btcEvent(1619999999000L, 29000.0, 29100.0)); // before range
-        tickRepository.insertTick(btcEvent(1620000030000L, 29100.0, 29200.0)); // in range
+        tickRepository.insertTick(btcEvent(1619999999000L, "29000", "29100")); // before range
+        tickRepository.insertTick(btcEvent(1620000030000L, "29100", "29200")); // in range
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -267,8 +269,8 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_tickAfterTo_excluded() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0)); // in range
-        tickRepository.insertTick(btcEvent(1620000600000L, 29100.0, 29200.0)); // after range
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100")); // in range
+        tickRepository.insertTick(btcEvent(1620000600000L, "29100", "29200")); // after range
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -280,8 +282,8 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_filtersBySymbol_doesNotCrossContaminate() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0));
-        tickRepository.insertTick(new BidAskEvent("ETH-USD", 3490.0, 3510.0, 1620000030000L));
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100"));
+        tickRepository.insertTick(new BidAskEvent("ETH-USD", bd("3490"), bd("3510"), 1620000030000L));
 
         var btc = tickRepository.queryCandles("BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
         var eth = tickRepository.queryCandles("ETH-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000060L);
@@ -297,9 +299,9 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_sortedAscendingByBucketTime() {
-        tickRepository.insertTick(btcEvent(1620000120000L, 29300.0, 29400.0)); // minute 2 — inserted first
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0)); // minute 0
-        tickRepository.insertTick(btcEvent(1620000090000L, 29150.0, 29250.0)); // minute 1
+        tickRepository.insertTick(btcEvent(1620000120000L, "29300", "29400")); // minute 2 — inserted first
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100")); // minute 0
+        tickRepository.insertTick(btcEvent(1620000090000L, "29150", "29250")); // minute 1
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.ONE_MINUTE, 1620000000L, 1620000180L);
@@ -313,7 +315,7 @@ class TickRepositoryIntegrationTest {
 
     @Test
     void queryCandles_candleHasCorrectIntervalLabel() {
-        tickRepository.insertTick(btcEvent(1620000030000L, 29000.0, 29100.0));
+        tickRepository.insertTick(btcEvent(1620000030000L, "29000", "29100"));
 
         var candles = tickRepository.queryCandles(
             "BTC-USD", CandleInterval.FIFTEEN_MIN, 1620000000L, 1620000900L);
@@ -324,7 +326,11 @@ class TickRepositoryIntegrationTest {
 
     // ── Helper ────────────────────────────────────────────────────────────────
 
-    private static BidAskEvent btcEvent(long timestampMs, double bid, double ask) {
-        return new BidAskEvent("BTC-USD", bid, ask, timestampMs);
+    private static BidAskEvent btcEvent(long timestampMs, String bid, String ask) {
+        return new BidAskEvent("BTC-USD", bd(bid), bd(ask), timestampMs);
+    }
+
+    private static BigDecimal bd(String val) {
+        return new BigDecimal(val);
     }
 }

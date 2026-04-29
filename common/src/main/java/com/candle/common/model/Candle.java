@@ -2,6 +2,8 @@ package com.candle.common.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.math.BigDecimal;
+
 /**
  * An OHLCV candlestick for a given symbol and interval.
  *
@@ -14,15 +16,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * close    — mid-price of the last tick in the window
  * volume   — number of ticks received in the window (synthetic volume)
  *
+ * BigDecimal is used for all price fields to avoid floating-point rounding
+ * errors that accumulate across OHLC aggregations.
+ *
  * Produced on-the-fly by TimescaleDB time_bucket() — never stored pre-aggregated.
  */
 public record Candle(
-        @JsonProperty("time")     long   time,
-        @JsonProperty("symbol")   String symbol,
-        @JsonProperty("interval") String interval,
-        @JsonProperty("open")     double open,
-        @JsonProperty("high")     double high,
-        @JsonProperty("low")      double low,
-        @JsonProperty("close")    double close,
-        @JsonProperty("volume")   long   volume
+        @JsonProperty("time")     long       time,
+        @JsonProperty("symbol")   String     symbol,
+        @JsonProperty("interval") String     interval,
+        @JsonProperty("open")     BigDecimal open,
+        @JsonProperty("high")     BigDecimal high,
+        @JsonProperty("low")      BigDecimal low,
+        @JsonProperty("close")    BigDecimal close,
+        @JsonProperty("volume")   long       volume
 ) {}

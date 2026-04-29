@@ -4,6 +4,8 @@ import com.candle.api.repository.TickRepository;
 import com.candle.common.config.CandleInterval;
 import com.candle.common.model.Candle;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -130,6 +132,8 @@ class CandleQueryServiceTest {
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private static Candle sampleCandle(long time) {
-        return new Candle(time, "BTC-USD", "1m", 29500.0, 29600.0, 29400.0, 29550.0, 10L);
+        return new Candle(time, "BTC-USD", "1m",
+            new BigDecimal("29500"), new BigDecimal("29600"),
+            new BigDecimal("29400"), new BigDecimal("29550"), 10L);
     }
 }

@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -41,7 +42,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_publishesOneEventPerSymbol() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -51,7 +52,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_noExtraPublications() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -63,7 +64,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_sendsToCorrectTopic() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -74,7 +75,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_usesSymbolAsPartitionKey() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -88,10 +89,10 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_btcEvent_hasCorrectBidAsk() {
-        when(priceSimulator.nextBidAsk(Symbols.BTC_USD)).thenReturn(new double[]{64950.0, 65050.0});
-        when(priceSimulator.nextBidAsk(Symbols.ETH_USD)).thenReturn(new double[]{3490.0, 3510.0});
-        when(priceSimulator.nextBidAsk(Symbols.XAU_USD)).thenReturn(new double[]{2295.0, 2305.0});
-        when(priceSimulator.nextBidAsk(Symbols.XAG_USD)).thenReturn(new double[]{28.48, 28.52});
+        when(priceSimulator.nextBidAsk(Symbols.BTC_USD)).thenReturn(bidAsk("64950", "65050"));
+        when(priceSimulator.nextBidAsk(Symbols.ETH_USD)).thenReturn(bidAsk("3490", "3510"));
+        when(priceSimulator.nextBidAsk(Symbols.XAU_USD)).thenReturn(bidAsk("2295", "2305"));
+        when(priceSimulator.nextBidAsk(Symbols.XAG_USD)).thenReturn(bidAsk("28.48", "28.52"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -101,13 +102,13 @@ class BidAskEventProducerTest {
 
         BidAskEvent btcEvent = captor.getValue();
         assertThat(btcEvent.symbol()).isEqualTo(Symbols.BTC_USD);
-        assertThat(btcEvent.bid()).isEqualTo(64950.0);
-        assertThat(btcEvent.ask()).isEqualTo(65050.0);
+        assertThat(btcEvent.bid()).isEqualByComparingTo(new BigDecimal("64950"));
+        assertThat(btcEvent.ask()).isEqualByComparingTo(new BigDecimal("65050"));
     }
 
     @Test
     void publishTicks_eventSymbolMatchesPartitionKey() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -126,7 +127,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_eventTimestampIsRecent() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         long before = System.currentTimeMillis();
@@ -137,9 +138,7 @@ class BidAskEventProducerTest {
         verify(kafkaTemplate, atLeastOnce()).send(any(), any(), captor.capture());
 
         for (BidAskEvent event : captor.getAllValues()) {
-            assertThat(event.timestamp())
-                .as("timestamp should be within the call window")
-                .isBetween(before, after);
+            assertThat(event.timestamp()).isBetween(before, after);
         }
     }
 
@@ -147,7 +146,7 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_callsSimulatorForEachSymbol() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         stubKafkaTemplate();
 
         producer.publishTicks();
@@ -161,16 +160,19 @@ class BidAskEventProducerTest {
 
     @Test
     void publishTicks_kafkaSendFails_doesNotThrow() {
-        when(priceSimulator.nextBidAsk(any())).thenReturn(new double[]{100.0, 101.0});
+        when(priceSimulator.nextBidAsk(any())).thenReturn(bidAsk("100", "101"));
         CompletableFuture<SendResult<String, BidAskEvent>> failed = new CompletableFuture<>();
         failed.completeExceptionally(new RuntimeException("Kafka unavailable"));
         when(kafkaTemplate.send(any(), any(), any())).thenReturn(failed);
 
-        // publishTicks logs the failure but must not propagate the exception to the scheduler
         producer.publishTicks();
     }
 
-    // ── Helper ───────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static BigDecimal[] bidAsk(String bid, String ask) {
+        return new BigDecimal[]{new BigDecimal(bid), new BigDecimal(ask)};
+    }
 
     @SuppressWarnings("unchecked")
     private void stubKafkaTemplate() {

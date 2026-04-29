@@ -5,14 +5,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * All supported candle intervals.
- *
- * Each interval knows its duration in seconds — used by:
- *   - stream-ingestion to determine window boundaries
- *   - history-api to enumerate timestamps between from/to
- *   - Redis key construction
- */
 public enum CandleInterval {
 
     ONE_SECOND  ("1s",   1),

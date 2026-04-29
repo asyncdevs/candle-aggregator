@@ -3,6 +3,7 @@ package com.candle.api.model;
 import com.candle.common.model.Candle;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,30 +20,36 @@ class HistoryResponseTest {
 
     @Test
     void ok_withSingleCandle_populatesAllArraysCorrectly() {
-        var candle = new Candle(1620000000L, "BTC-USD", "1m", 29500.0, 29600.0, 29400.0, 29550.0, 10L);
+        var candle = new Candle(1620000000L, "BTC-USD", "1m", bd("29500"), bd("29600"), bd("29400"), bd("29550"), 10L);
         var response = HistoryResponse.ok(List.of(candle));
 
         assertThat(response.t()).containsExactly(1620000000L);
-        assertThat(response.o()).containsExactly(29500.0);
-        assertThat(response.h()).containsExactly(29600.0);
-        assertThat(response.l()).containsExactly(29400.0);
-        assertThat(response.c()).containsExactly(29550.0);
+        assertThat(response.o()[0]).isEqualByComparingTo(bd("29500"));
+        assertThat(response.h()[0]).isEqualByComparingTo(bd("29600"));
+        assertThat(response.l()[0]).isEqualByComparingTo(bd("29400"));
+        assertThat(response.c()[0]).isEqualByComparingTo(bd("29550"));
         assertThat(response.v()).containsExactly(10L);
     }
 
     @Test
     void ok_withMultipleCandles_preservesOrder() {
-        var c1 = new Candle(1620000000L, "BTC-USD", "1m", 29500.0, 29600.0, 29400.0, 29550.0, 10L);
-        var c2 = new Candle(1620000060L, "BTC-USD", "1m", 29550.0, 29700.0, 29500.0, 29680.0, 8L);
-        var c3 = new Candle(1620000120L, "BTC-USD", "1m", 29680.0, 29800.0, 29650.0, 29770.0, 14L);
+        var c1 = new Candle(1620000000L, "BTC-USD", "1m", bd("29500"), bd("29600"), bd("29400"), bd("29550"), 10L);
+        var c2 = new Candle(1620000060L, "BTC-USD", "1m", bd("29550"), bd("29700"), bd("29500"), bd("29680"), 8L);
+        var c3 = new Candle(1620000120L, "BTC-USD", "1m", bd("29680"), bd("29800"), bd("29650"), bd("29770"), 14L);
         var response = HistoryResponse.ok(List.of(c1, c2, c3));
 
         assertThat(response.t()).containsExactly(1620000000L, 1620000060L, 1620000120L);
-        assertThat(response.o()).containsExactly(29500.0, 29550.0, 29680.0);
-        assertThat(response.h()).containsExactly(29600.0, 29700.0, 29800.0);
-        assertThat(response.l()).containsExactly(29400.0, 29500.0, 29650.0);
-        assertThat(response.c()).containsExactly(29550.0, 29680.0, 29770.0);
         assertThat(response.v()).containsExactly(10L, 8L, 14L);
+        BigDecimal[] expectedO = {bd("29500"), bd("29550"), bd("29680")};
+        BigDecimal[] expectedH = {bd("29600"), bd("29700"), bd("29800")};
+        BigDecimal[] expectedL = {bd("29400"), bd("29500"), bd("29650")};
+        BigDecimal[] expectedC = {bd("29550"), bd("29680"), bd("29770")};
+        for (int i = 0; i < 3; i++) {
+            assertThat(response.o()[i]).isEqualByComparingTo(expectedO[i]);
+            assertThat(response.h()[i]).isEqualByComparingTo(expectedH[i]);
+            assertThat(response.l()[i]).isEqualByComparingTo(expectedL[i]);
+            assertThat(response.c()[i]).isEqualByComparingTo(expectedC[i]);
+        }
     }
 
     @Test
@@ -153,6 +160,10 @@ class HistoryResponseTest {
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private static Candle sampleCandle(long time) {
-        return new Candle(time, "BTC-USD", "1m", 100.0, 110.0, 90.0, 105.0, 5L);
+        return new Candle(time, "BTC-USD", "1m", bd("100"), bd("110"), bd("90"), bd("105"), 5L);
+    }
+
+    private static BigDecimal bd(String val) {
+        return new BigDecimal(val);
     }
 }

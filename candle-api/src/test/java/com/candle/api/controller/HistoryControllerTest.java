@@ -3,6 +3,8 @@ package com.candle.api.controller;
 import com.candle.api.service.CandleQueryService;
 import com.candle.common.model.Candle;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -55,8 +57,8 @@ class HistoryControllerTest {
     void getHistory_multipleCandles_returnsParallelArraysInOrder() throws Exception {
         when(candleQueryService.getCandles(any(), any(), anyLong(), anyLong()))
             .thenReturn(List.of(
-                new Candle(1620000000L, "BTC-USD", "1m", 100.0, 110.0, 90.0,  105.0, 3L),
-                new Candle(1620000060L, "BTC-USD", "1m", 105.0, 115.0, 100.0, 112.0, 5L)
+                new Candle(1620000000L, "BTC-USD", "1m", bd("100"), bd("110"), bd("90"),  bd("105"), 3L),
+                new Candle(1620000060L, "BTC-USD", "1m", bd("105"), bd("115"), bd("100"), bd("112"), 5L)
             ));
 
         mockMvc.perform(get("/history")
@@ -184,6 +186,45 @@ class HistoryControllerTest {
             .andExpect(status().isBadRequest());
     }
 
+    // ── from >= to validation ────────────────────────────────────────────────
+
+    @Test
+    void getHistory_fromEqualsTo_returns400WithErrorStatus() throws Exception {
+        mockMvc.perform(get("/history")
+                .param("symbol",   "BTC-USD")
+                .param("interval", "1m")
+                .param("from",     "1620000000")
+                .param("to",       "1620000000"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.s").value("error"))
+            .andExpect(jsonPath("$.errmsg").exists());
+    }
+
+    @Test
+    void getHistory_fromGreaterThanTo_returns400WithErrorStatus() throws Exception {
+        mockMvc.perform(get("/history")
+                .param("symbol",   "BTC-USD")
+                .param("interval", "1m")
+                .param("from",     "1620000600")
+                .param("to",       "1620000000"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.s").value("error"))
+            .andExpect(jsonPath("$.errmsg").value(
+                org.hamcrest.Matchers.containsString("must be strictly less than")));
+    }
+
+    @Test
+    void getHistory_fromGreaterThanTo_doesNotCallService() throws Exception {
+        mockMvc.perform(get("/history")
+                .param("symbol",   "BTC-USD")
+                .param("interval", "1m")
+                .param("from",     "9999999999")
+                .param("to",       "1000000000"))
+            .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verifyNoInteractions(candleQueryService);
+    }
+
     // ── Response format — no nulls in ok response ────────────────────────────
 
     @Test
@@ -206,6 +247,10 @@ class HistoryControllerTest {
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private static Candle btcCandle(long time) {
-        return new Candle(time, "BTC-USD", "1m", 29500.0, 29600.0, 29400.0, 29550.0, 10L);
+        return new Candle(time, "BTC-USD", "1m", bd("29500"), bd("29600"), bd("29400"), bd("29550"), 10L);
+    }
+
+    private static BigDecimal bd(String val) {
+        return new BigDecimal(val);
     }
 }

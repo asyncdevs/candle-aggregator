@@ -1,0 +1,21 @@
+# Test profile for logger-service.
+# @EmbeddedKafka sets spring.embedded.kafka.brokers automatically;
+# @TestPropertySource in each test wires that into bootstrap-servers.
+
+spring:
+  kafka:
+    consumer:
+      group-id: test-logger-group
+      auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+logging:
+  level:
+    com.candle: WARN
+    org.apache.kafka: ERROR
+    org.springframework.kafka: ERROR

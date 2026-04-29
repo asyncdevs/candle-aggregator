@@ -256,6 +256,8 @@ mvn verify
 | `candle-api` | `HistoryControllerTest` | Slice (`@WebMvcTest`) | HTTP 200 with data, HTTP 200 no_data, all valid intervals, HTTP 400 for invalid interval/missing params/wrong type, response body format, `@JsonInclude(NON_NULL)` omits null fields |
 | `candle-api` | `TickRepositoryIntegrationTest` | Integration (Docker) | Insert persistence, mid_price calculation, millisecond precision, multi-row insert, empty query, OHLCV aggregation (1 tick, 2 ticks, 3 ticks), multi-window bucketing, 5s interval, `from` inclusive / `to` exclusive, symbol isolation, ascending sort, interval label |
 | `candle-api` | `HistoryApiIntegrationTest` | Integration (EmbeddedKafka) | Actuator health, history endpoint with mocked data, 400 on invalid interval, missing param, Kafka consumer delivers to repository (single and multi-event) |
+| `logger-service` | `CandleEventConsumerTest` | Unit | No-throw guarantee for all symbols, exactly one log per `consume()` call, INFO level, all 7 structured fields present (`event_type`, `symbol`, `bid`, `ask`, `mid_price`, `event_ts_ms`, `event_ts_iso`), ISO-8601 timestamp format |
+| `logger-service` | `LoggerServiceIntegrationTest` | Integration (EmbeddedKafka) | Actuator health, Kafka listener wired to consumer, single and multi-event delivery verified via `@SpyBean`, payload field matching |
 
 ---
 

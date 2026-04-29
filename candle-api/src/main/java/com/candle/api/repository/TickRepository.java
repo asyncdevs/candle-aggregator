@@ -15,13 +15,16 @@ import java.util.List;
  *
  * <h3>Insert</h3>
  * Each raw BidAsk tick is written as a single row into the 'ticks' hypertable.
- * TimescaleDB auto-partitions by time — no manual partitioning logic needed.
+ * BigDecimal values are passed directly to JdbcTemplate — the PostgreSQL JDBC
+ * driver maps them to the NUMERIC(19,8) columns without precision loss.
  *
  * <h3>Query</h3>
  * {@code time_bucket(interval, time)} groups ticks into OHLCV candles entirely
- * inside the database.  {@code first()} and {@code last()} are TimescaleDB
+ * inside the database. {@code first()} and {@code last()} are TimescaleDB
  * aggregate functions that preserve the chronological open/close price without
  * an ORDER BY, making aggregation efficient even over millions of rows.
+ * ResultSet columns are read with {@code getBigDecimal()} to preserve the exact
+ * NUMERIC precision returned by the database.
  */
 @Slf4j
 @Repository
@@ -37,6 +40,7 @@ public class TickRepository {
      *
      * {@code to_timestamp(ms / 1000.0)} converts epoch-milliseconds to
      * TIMESTAMPTZ, preserving sub-second precision for the 'ticks' hypertable.
+     * BigDecimal bid/ask/mid_price map cleanly to the NUMERIC(19,8) columns.
      */
     public void insertTick(BidAskEvent event) {
         jdbcTemplate.update(
@@ -66,8 +70,6 @@ public class TickRepository {
                                      long fromEpochSec,
                                      long toEpochSec) {
 
-        // EXTRACT(EPOCH …)::BIGINT converts the TIMESTAMPTZ bucket back to
-        // unix-epoch-seconds so the Candle record stays a plain long.
         String sql =
             "SELECT " +
             "  EXTRACT(EPOCH FROM time_bucket(CAST(? AS INTERVAL), time))::BIGINT AS bucket_epoch, " +
@@ -89,10 +91,10 @@ public class TickRepository {
                 rs.getLong("bucket_epoch"),
                 symbol,
                 interval.getLabel(),
-                rs.getDouble("open"),
-                rs.getDouble("high"),
-                rs.getDouble("low"),
-                rs.getDouble("close"),
+                rs.getBigDecimal("open"),
+                rs.getBigDecimal("high"),
+                rs.getBigDecimal("low"),
+                rs.getBigDecimal("close"),
                 rs.getLong("volume")
             ),
             interval.toPgInterval(),

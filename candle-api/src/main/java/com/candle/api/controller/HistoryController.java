@@ -21,26 +21,11 @@ import java.util.List;
  *   &to       = 1620000600        (unix seconds, exclusive)
  * </pre>
  *
- * Success response (data exists):
- * <pre>
- * {
- *   "s": "ok",
- *   "t": [1620000000, 1620000060, ...],
- *   "o": [29500.5,    29501.0,    ...],
- *   "h": [29510.0,    29505.0,    ...],
- *   "l": [29490.0,    29500.0,    ...],
- *   "c": [29505.0,    29502.0,    ...],
- *   "v": [10,         8,          ...]
- * }
- * </pre>
- *
- * No data in range:
- * <pre>{ "s": "no_data" }</pre>
- *
- * Unknown interval or other validation error (HTTP 400):
- * <pre>{ "s": "error", "errmsg": "Unknown interval: 2x. Supported: ..." }</pre>
- *
- * Health: GET /actuator/health
+ * Validation rules:
+ * <ul>
+ *   <li>{@code interval} must be one of the supported labels — HTTP 400 otherwise.</li>
+ *   <li>{@code from} must be strictly less than {@code to} — HTTP 400 otherwise.</li>
+ * </ul>
  */
 @Slf4j
 @RestController
@@ -49,16 +34,18 @@ public class HistoryController {
 
     private final CandleQueryService queryService;
 
-    /**
-     * Returns historical OHLCV candles for the requested symbol, interval,
-     * and time range in TradingView UDF parallel-array format.
-     */
     @GetMapping("/history")
     public ResponseEntity<HistoryResponse> getHistory(
             @RequestParam String symbol,
             @RequestParam String interval,
             @RequestParam long   from,
             @RequestParam long   to) {
+
+        if (from >= to) {
+            String msg = String.format("'from' (%d) must be strictly less than 'to' (%d)", from, to);
+            log.warn("[HISTORY] BAD REQUEST: {}", msg);
+            return ResponseEntity.badRequest().body(HistoryResponse.error(msg));
+        }
 
         log.info("[HISTORY] REQUEST  symbol={}  interval={}  from={}  to={}",
             symbol, interval, from, to);

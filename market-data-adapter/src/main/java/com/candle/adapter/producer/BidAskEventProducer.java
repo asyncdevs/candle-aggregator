@@ -10,6 +10,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 
 /**
@@ -33,7 +35,7 @@ public class BidAskEventProducer {
         long nowMs = Instant.now().toEpochMilli();
 
         for (String symbol : Symbols.ALL) {
-            double[] bidAsk = priceSimulator.nextBidAsk(symbol);
+            BigDecimal[] bidAsk = priceSimulator.nextBidAsk(symbol);
             BidAskEvent event = new BidAskEvent(symbol, bidAsk[0], bidAsk[1], nowMs);
 
             kafkaTemplate.send(KafkaTopics.RAW_BIDASK_EVENTS, symbol, event)
@@ -42,12 +44,14 @@ public class BidAskEventProducer {
                         log.error("[ADAPTER] PUBLISH FAILED  symbol={}  error={}",
                             symbol, ex.getMessage());
                     } else {
+                        BigDecimal mid = bidAsk[0].add(bidAsk[1])
+                            .divide(BigDecimal.valueOf(2), 4, RoundingMode.HALF_UP);
                         log.info("[ADAPTER] PUBLISHED  symbol={}  bid={}  ask={}  mid={}  " +
                                  "partition={}  offset={}",
                             symbol,
-                            bidAsk[0],
-                            bidAsk[1],
-                            String.format("%.4f", (bidAsk[0] + bidAsk[1]) / 2.0),
+                            bidAsk[0].toPlainString(),
+                            bidAsk[1].toPlainString(),
+                            mid.toPlainString(),
                             result.getRecordMetadata().partition(),
                             result.getRecordMetadata().offset());
                     }

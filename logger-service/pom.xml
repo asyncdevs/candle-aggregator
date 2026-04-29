@@ -58,6 +58,15 @@
             <artifactId>logstash-logback-encoder</artifactId>
             <version>${logstash-encoder.version}</version>
         </dependency>
+
+        <!-- ── Test dependencies ────────────────────────────────────────── -->
+
+        <!-- Spring Kafka Test: @EmbeddedKafka for integration tests -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

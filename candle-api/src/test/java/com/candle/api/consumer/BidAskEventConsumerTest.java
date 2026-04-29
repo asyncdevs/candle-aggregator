@@ -3,6 +3,8 @@ package com.candle.api.consumer;
 import com.candle.api.repository.TickRepository;
 import com.candle.common.model.BidAskEvent;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -25,7 +27,7 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_callsInsertTick_once() {
-        var event = new BidAskEvent("BTC-USD", 29000.0, 29100.0, 1620000000000L);
+        var event = new BidAskEvent("BTC-USD", bd("29000"), bd("29100"), 1620000000000L);
 
         consumer.consume(event);
 
@@ -34,7 +36,7 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_passesExactEventToRepository() {
-        var event = new BidAskEvent("ETH-USD", 3490.0, 3510.0, 1620000001000L);
+        var event = new BidAskEvent("ETH-USD", bd("3490"), bd("3510"), 1620000001000L);
 
         consumer.consume(event);
 
@@ -44,10 +46,10 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_multipleEvents_eachPersistedExactlyOnce() {
-        var e1 = new BidAskEvent("BTC-USD", 29000.0, 29100.0, 1620000000000L);
-        var e2 = new BidAskEvent("ETH-USD", 3490.0,  3510.0,  1620000001000L);
-        var e3 = new BidAskEvent("XAU-USD", 2295.0,  2305.0,  1620000002000L);
-        var e4 = new BidAskEvent("XAG-USD", 28.45,   28.55,   1620000003000L);
+        var e1 = new BidAskEvent("BTC-USD", bd("29000"), bd("29100"), 1620000000000L);
+        var e2 = new BidAskEvent("ETH-USD", bd("3490"),  bd("3510"),  1620000001000L);
+        var e3 = new BidAskEvent("XAU-USD", bd("2295"),  bd("2305"),  1620000002000L);
+        var e4 = new BidAskEvent("XAG-USD", bd("28.45"), bd("28.55"), 1620000003000L);
 
         consumer.consume(e1);
         consumer.consume(e2);
@@ -65,8 +67,8 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_sameSymbolMultipleTimes_allPersisted() {
-        var e1 = new BidAskEvent("BTC-USD", 29000.0, 29100.0, 1620000000000L);
-        var e2 = new BidAskEvent("BTC-USD", 29010.0, 29110.0, 1620000001000L);
+        var e1 = new BidAskEvent("BTC-USD", bd("29000"), bd("29100"), 1620000000000L);
+        var e2 = new BidAskEvent("BTC-USD", bd("29010"), bd("29110"), 1620000001000L);
 
         consumer.consume(e1);
         consumer.consume(e2);
@@ -80,7 +82,7 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_repositoryThrows_exceptionPropagates() {
-        var event = new BidAskEvent("BTC-USD", 29000.0, 29100.0, 1620000000000L);
+        var event = new BidAskEvent("BTC-USD", bd("29000"), bd("29100"), 1620000000000L);
         doThrow(new RuntimeException("DB write failed")).when(tickRepository).insertTick(any());
 
         assertThrows(RuntimeException.class, () -> consumer.consume(event));
@@ -88,11 +90,17 @@ class BidAskEventConsumerTest {
 
     @Test
     void consume_afterRepositoryThrows_noAdditionalRepositoryCalls() {
-        var bad  = new BidAskEvent("BTC-USD", 29000.0, 29100.0, 1620000000000L);
+        var bad  = new BidAskEvent("BTC-USD", bd("29000"), bd("29100"), 1620000000000L);
         doThrow(new RuntimeException("transient error")).when(tickRepository).insertTick(bad);
 
         try { consumer.consume(bad); } catch (RuntimeException ignored) {}
 
         verify(tickRepository, times(1)).insertTick(any());
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    private static BigDecimal bd(String val) {
+        return new BigDecimal(val);
     }
 }

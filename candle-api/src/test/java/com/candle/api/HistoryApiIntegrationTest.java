@@ -4,6 +4,8 @@ import com.candle.api.repository.TickRepository;
 import com.candle.common.config.KafkaTopics;
 import com.candle.common.model.BidAskEvent;
 import com.candle.common.model.Candle;
+
+import java.math.BigDecimal;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Tag;
@@ -98,7 +100,9 @@ class HistoryApiIntegrationTest {
     @Test
     void historyEndpoint_withMockedCandles_returnsOkResponse() throws Exception {
         var candles = List.of(
-            new Candle(1620000000L, "BTC-USD", "1m", 29500.0, 29600.0, 29400.0, 29550.0, 5L)
+            new Candle(1620000000L, "BTC-USD", "1m",
+                new BigDecimal("29500"), new BigDecimal("29600"),
+                new BigDecimal("29400"), new BigDecimal("29550"), 5L)
         );
         when(tickRepository.queryCandles(any(), any(), anyLong(), anyLong()))
             .thenReturn(candles);
@@ -143,7 +147,7 @@ class HistoryApiIntegrationTest {
 
     @Test
     void kafkaConsumer_receivesEvent_forwardsToRepository() {
-        var event = new BidAskEvent("BTC-USD", 29000.0, 29100.0, System.currentTimeMillis());
+        var event = new BidAskEvent("BTC-USD", new BigDecimal("29000"), new BigDecimal("29100"), System.currentTimeMillis());
 
         testKafkaTemplate.send(KafkaTopics.RAW_BIDASK_EVENTS, "BTC-USD", event);
 
@@ -156,9 +160,9 @@ class HistoryApiIntegrationTest {
     void kafkaConsumer_multipleEvents_allForwardedToRepository() {
         long now = System.currentTimeMillis();
         testKafkaTemplate.send(KafkaTopics.RAW_BIDASK_EVENTS, "BTC-USD",
-            new BidAskEvent("BTC-USD", 29000.0, 29100.0, now));
+            new BidAskEvent("BTC-USD", new BigDecimal("29000"), new BigDecimal("29100"), now));
         testKafkaTemplate.send(KafkaTopics.RAW_BIDASK_EVENTS, "ETH-USD",
-            new BidAskEvent("ETH-USD", 3490.0, 3510.0, now));
+            new BidAskEvent("ETH-USD", new BigDecimal("3490"), new BigDecimal("3510"), now));
 
         await().atMost(10, TimeUnit.SECONDS)
             .untilAsserted(() ->

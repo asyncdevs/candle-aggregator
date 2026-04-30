@@ -9,10 +9,10 @@ A platform that ingests a real-time stream of bid/ask market data, aggregates it
 1. [Architecture Overview](#architecture-overview)
 2. [Assumptions and Trade-offs](#assumptions-and-trade-offs)
 3. [Module Breakdown](#module-breakdown)
-4. [Data Flow](#data-flow)
+4. [System Execution Flow](#system-execution-flow)
 5. [API Reference](#api-reference)
-6. [Running the Service](#running-the-service)
-7. [Running Tests](#running-tests)
+6. [Setting Up the Service](#setting-up-the-service)
+7. [Test Case Setup](#test-case-setup)
 
 ---
 
@@ -98,7 +98,7 @@ Key class: `CandleEventConsumer`
 
 ---
 
-## Data Flow
+## System Execution Flow
 
 
 ![mermaid-diagram-2026-04-29-184426.png](mermaid-diagram-2026-04-29-184426.png)
@@ -155,7 +155,7 @@ GET /actuator/metrics
 
 ---
 
-## Running the Service
+## Setting Up the Service
 
 ### Prerequisites
 
@@ -186,7 +186,7 @@ Services come up in dependency order. Allow ~30 seconds for TimescaleDB to accep
 
 ---
 
-## Running Tests
+## Test Case Setup
 
 The test suite is split into three tiers by speed and infrastructure requirements.
 
